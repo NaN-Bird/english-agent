@@ -1,0 +1,18 @@
+# Залежності
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Змінні середовища
+.env
+server/.env
+
+# Збірка
+build/
+dist/
+client/build/
+
+# Системне
+.DS_Store
+.idea/
+.vscode/
