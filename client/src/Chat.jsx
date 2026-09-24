@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./Chat.css";
 
-const API_URL = "/api/chat";   // ✅ працює і локально (з proxy), і на VPS
+const API_URL = "/api/chat";
 
 export default function Chat() {
     const [messages, setMessages] = useState([]);
@@ -11,20 +11,34 @@ export default function Chat() {
     const [isListening, setIsListening] = useState(false);
     const [autoSpeak, setAutoSpeak] = useState(true);
     const [conversationMode, setConversationMode] = useState(false);
+
     const messagesEndRef = useRef(null);
     const recognitionRef = useRef(null);
 
-    // Автоскрол до низу
+    // 🔑 Refs для актуальних значень у замиканнях
+    const conversationModeRef = useRef(conversationMode);
+    const loadingRef = useRef(loading);
+    const messagesRef = useRef(messages);
+    const topicRef = useRef(topic);
+    const autoSpeakRef = useRef(autoSpeak);
+
+    // Синхронізуємо refs зі станом
+    useEffect(() => { conversationModeRef.current = conversationMode; }, [conversationMode]);
+    useEffect(() => { loadingRef.current = loading; }, [loading]);
+    useEffect(() => { messagesRef.current = messages; }, [messages]);
+    useEffect(() => { topicRef.current = topic; }, [topic]);
+    useEffect(() => { autoSpeakRef.current = autoSpeak; }, [autoSpeak]);
+
+    // Автоскрол
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
     // ===== ВІДПРАВКА =====
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!input.trim() || loading) return;
+    const sendMessage = async (text) => {
+        if (!text.trim() || loadingRef.current) return;
 
-        const userMessage = { role: "user", content: input };
+        const userMessage = { role: "user", content: text };
         setMessages((prev) => [...prev, userMessage]);
         setInput("");
         setLoading(true);
@@ -34,9 +48,9 @@ export default function Chat() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    message: input,
-                    history: messages,
-                    topic: topic
+                    message: text,
+                    history: messagesRef.current,
+                    topic: topicRef.current
                 })
             });
 
@@ -55,26 +69,24 @@ export default function Chat() {
         }
     };
 
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        sendMessage(input);
+    };
+
     // ===== ЗУПИНИТИ ВСЕ =====
     const stopAll = () => {
-        // Зупинити озвучку
         window.speechSynthesis.cancel();
-
-        // Зупинити розпізнавання
         if (recognitionRef.current) {
-            try {
-                recognitionRef.current.stop();
-            } catch (e) {
-                console.log("Recognition already stopped");
-            }
+            try { recognitionRef.current.stop(); } catch (e) {}
         }
-
         setIsListening(false);
         setConversationMode(false);
+        conversationModeRef.current = false;
         console.log("⏹️ Все зупинено");
     };
 
-    // ===== РОЗПІЗНАВАННЯ ГОЛОСУ =====
+    // ===== РОЗПІЗНАВАННЯ =====
     const startListening = () => {
         const SpeechRecognition =
             window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -84,11 +96,13 @@ export default function Chat() {
             return;
         }
 
+        // Якщо вже слухаємо — не запускаємо знову
+        if (isListening) return;
+
         const recognition = new SpeechRecognition();
         recognition.lang = "en-US";
         recognition.continuous = false;
         recognition.interimResults = false;
-
         recognitionRef.current = recognition;
 
         recognition.onstart = () => {
@@ -100,19 +114,16 @@ export default function Chat() {
             setInput(transcript);
             setIsListening(false);
 
-            // Автоматично відправити (якщо режим бесіди)
-            if (conversationMode) {
-                setTimeout(() => {
-                    const form = document.querySelector(".chat-form");
-                    if (form) {
-                        form.requestSubmit();
-                    }
-                }, 500);
+            console.log("🎤 Розпізнано:", transcript, "| Режим бесіди:", conversationModeRef.current);
+
+            // Автоматично відправити (перевіряємо через ref!)
+            if (conversationModeRef.current) {
+                setTimeout(() => sendMessage(transcript), 300);
             }
         };
 
         recognition.onerror = (event) => {
-            console.error("Помилка:", event.error);
+            console.error("Recognition помилка:", event.error);
             setIsListening(false);
         };
 
@@ -129,8 +140,7 @@ export default function Chat() {
 
     // ===== ОЗВУЧКА =====
     const speak = (text) => {
-        if (!autoSpeak) return;
-
+        if (!autoSpeakRef.current) return;
         window.speechSynthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
@@ -138,12 +148,11 @@ export default function Chat() {
         utterance.rate = 0.9;
         utterance.pitch = 1;
 
-        // Після озвучки — знову слухати (тільки в режимі бесіди)
         utterance.onend = () => {
-            if (conversationMode) {
-                setTimeout(() => {
-                    startListening();
-                }, 500);
+            console.log("🔊 Озвучка закінчена | Режим бесіди:", conversationModeRef.current);
+            // Після озвучки — знову слухати (перевіряємо через ref!)
+            if (conversationModeRef.current) {
+                setTimeout(() => startListening(), 500);
             }
         };
 
@@ -154,7 +163,6 @@ export default function Chat() {
         <div className="chat-container">
             <h1>🇬🇧 English Practice</h1>
 
-            {/* Вибір теми */}
             <div className="topic-selector">
                 <label>Тема:</label>
                 <select value={topic} onChange={(e) => setTopic(e.target.value)}>
@@ -166,7 +174,6 @@ export default function Chat() {
                 </select>
             </div>
 
-            {/* Перемикач озвучки */}
             <div className="speak-toggle">
                 <label>
                     <input
@@ -178,15 +185,16 @@ export default function Chat() {
                 </label>
             </div>
 
-            {/* Режим бесіди */}
             <div className="conversation-toggle">
                 <label>
                     <input
                         type="checkbox"
                         checked={conversationMode}
                         onChange={(e) => {
-                            setConversationMode(e.target.checked);
-                            if (e.target.checked) {
+                            const checked = e.target.checked;
+                            setConversationMode(checked);
+                            conversationModeRef.current = checked;
+                            if (checked) {
                                 setTimeout(() => startListening(), 300);
                             } else {
                                 stopAll();
@@ -197,17 +205,12 @@ export default function Chat() {
                 </label>
 
                 {conversationMode && (
-                    <button
-                        className="stop-btn"
-                        onClick={stopAll}
-                        title="Зупинити"
-                    >
+                    <button className="stop-btn" onClick={stopAll} title="Зупинити">
                         ⏹️ Стоп
                     </button>
                 )}
             </div>
 
-            {/* Чат */}
             <div className="messages">
                 {messages.length === 0 && (
                     <div className="welcome">
@@ -229,7 +232,6 @@ export default function Chat() {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Форма */}
             <form onSubmit={handleSubmit} className="chat-form">
                 <input
                     type="text"

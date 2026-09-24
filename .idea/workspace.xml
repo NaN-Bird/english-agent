@@ -11,7 +11,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e31ce843-ead1-4745-8682-48288bc3bab1" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -71,7 +70,9 @@
       <workItem from="1789966577139" duration="5314000" />
       <workItem from="1790007183337" duration="4787000" />
       <workItem from="1790056782665" duration="5214000" />
-      <workItem from="1790087798796" duration="3469000" />
+      <workItem from="1790087798796" duration="7658000" />
+      <workItem from="1790187402611" duration="1964000" />
+      <workItem from="1790222530530" duration="4449000" />
     </task>
     <servers />
   </component>
@@ -95,9 +96,9 @@
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
     <state x="734" y="322" key="#com.intellij.fileTypes.FileTypeChooser/-1920.0.1920.1040/0.0.1920.1040/1920.0.1920.1040@0.0.1920.1040" timestamp="1790011432774" />
-    <state x="461" y="165" key="SettingsEditor" timestamp="1789924163035">
+    <state x="461" y="165" key="SettingsEditor" timestamp="1790099468452">
       <screen x="0" y="0" width="1920" height="1040" />
     </state>
-    <state x="461" y="165" key="SettingsEditor/-1920.0.1920.1040/0.0.1920.1040/1920.0.1920.1040@0.0.1920.1040" timestamp="1789924163035" />
+    <state x="461" y="165" key="SettingsEditor/-1920.0.1920.1040/0.0.1920.1040/1920.0.1920.1040@0.0.1920.1040" timestamp="1790099468452" />
   </component>
 </project>
