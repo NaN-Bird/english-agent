@@ -239,3 +239,82 @@
 .stop-btn:active {
     transform: scale(0.95);
 }
+/* ===== МОБІЛЬНА АДАПТАЦІЯ ===== */
+@media (max-width: 600px) {
+    .chat-container {
+        padding: 10px;
+    }
+
+    .chat-container h1 {
+        font-size: 1.4rem;
+        margin-bottom: 12px;
+    }
+
+    .messages {
+        height: 55vh;
+        padding: 12px;
+        border-radius: 12px;
+    }
+
+    .message-content {
+        max-width: 85%;
+        font-size: 14px;
+        padding: 10px 12px;
+    }
+
+    /* Форма — головне виправлення */
+    .chat-form {
+        gap: 6px;
+        width: 100%;
+    }
+
+    .chat-form input {
+        flex: 1;
+        min-width: 0;          /* ← ключове! дозволяє input стискатись */
+        padding: 12px 14px;
+        font-size: 14px;
+        border-radius: 24px;
+    }
+
+    .chat-form button,
+    .mic-btn {
+        padding: 12px 14px;
+        font-size: 16px;
+        border-radius: 24px;
+        flex-shrink: 0;        /* ← ключове! кнопки не стискаються */
+        min-width: 48px;
+    }
+
+    .topic-selector {
+        flex-wrap: wrap;
+    }
+
+    .topic-selector select {
+        font-size: 13px;
+        padding: 6px 12px;
+    }
+
+    .speak-toggle,
+    .conversation-toggle {
+        font-size: 13px;
+    }
+
+    .conversation-toggle {
+        padding: 8px;
+    }
+}
+
+/* Дуже вузькі екрани (iPhone SE, старі Android) */
+@media (max-width: 380px) {
+    .chat-form input {
+        padding: 10px 12px;
+        font-size: 13px;
+    }
+
+    .chat-form button,
+    .mic-btn {
+        padding: 10px 12px;
+        font-size: 15px;
+        min-width: 42px;
+    }
+}
