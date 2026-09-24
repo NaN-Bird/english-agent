@@ -4,8 +4,9 @@ import "./Chat.css";
 const API_URL = "/api/chat";
 const SAVE_URL = "/api/save-message";
 const HISTORY_URL = "/api/history";
+const TRACK_URL = "/api/track";
+const PROGRESS_URL = "/api/progress";
 
-// Простий userId (поки без акаунтів)
 function getUserId() {
     let id = localStorage.getItem("userId");
     if (!id) {
@@ -13,6 +14,10 @@ function getUserId() {
         localStorage.setItem("userId", id);
     }
     return id;
+}
+
+function countWords(text) {
+    return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 export default function Chat() {
@@ -24,12 +29,12 @@ export default function Chat() {
     const [autoSpeak, setAutoSpeak] = useState(true);
     const [conversationMode, setConversationMode] = useState(false);
     const [historyLoaded, setHistoryLoaded] = useState(false);
+    const [progress, setProgress] = useState(null);
 
     const messagesEndRef = useRef(null);
     const recognitionRef = useRef(null);
     const userIdRef = useRef(getUserId());
 
-    // Refs для актуальних значень у замиканнях
     const conversationModeRef = useRef(conversationMode);
     const loadingRef = useRef(loading);
     const messagesRef = useRef(messages);
@@ -42,12 +47,11 @@ export default function Chat() {
     useEffect(() => { topicRef.current = topic; }, [topic]);
     useEffect(() => { autoSpeakRef.current = autoSpeak; }, [autoSpeak]);
 
-    // Автоскрол
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    // ===== ЗАВАНТАЖЕННЯ ІСТОРІЇ ПРИ СТАРТІ =====
+    // ===== ЗАВАНТАЖЕННЯ ІСТОРІЇ =====
     useEffect(() => {
         const loadHistory = async () => {
             try {
@@ -60,7 +64,7 @@ export default function Chat() {
                         content: m.content,
                     }));
                     setMessages(restored);
-                    console.log("📜 Історія завантажена:", restored.length, "повідомлень");
+                    console.log("📜 Історія завантажена:", restored.length);
                 }
             } catch (err) {
                 console.warn("Історія не завантажена:", err.message);
@@ -69,7 +73,21 @@ export default function Chat() {
             }
         };
         loadHistory();
+        loadProgress();
     }, []);
+
+    // ===== ЗАВАНТАЖЕННЯ ПРОГРЕСУ =====
+    const loadProgress = async () => {
+        try {
+            const res = await fetch(`${PROGRESS_URL}/${userIdRef.current}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            setProgress(data);
+            console.log("📊 Прогрес:", data);
+        } catch (err) {
+            console.warn("Прогрес не завантажено:", err.message);
+        }
+    };
 
     // ===== ЗБЕРЕЖЕННЯ ПОВІДОМЛЕННЯ =====
     const saveMessage = async (role, content, topicValue) => {
@@ -89,6 +107,24 @@ export default function Chat() {
         }
     };
 
+    // ===== ЗАПИС ПОДІЇ =====
+    const trackEvent = async (type, topicValue, wordCount = 0) => {
+        try {
+            await fetch(TRACK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId: userIdRef.current,
+                    type,
+                    topic: topicValue,
+                    wordCount,
+                }),
+            });
+        } catch (err) {
+            console.warn("Не вдалось записати подію:", err.message);
+        }
+    };
+
     // ===== ВІДПРАВКА =====
     const sendMessage = async (text) => {
         if (!text.trim() || loadingRef.current) return;
@@ -98,8 +134,8 @@ export default function Chat() {
         setInput("");
         setLoading(true);
 
-        // Зберігаємо повідомлення користувача
         saveMessage("user", text, topicRef.current);
+        trackEvent("message_sent", topicRef.current, countWords(text));
 
         try {
             const response = await fetch(API_URL, {
@@ -116,10 +152,11 @@ export default function Chat() {
             const aiMessage = { role: "assistant", content: data.reply };
             setMessages((prev) => [...prev, aiMessage]);
 
-            // Зберігаємо відповідь AI
             saveMessage("assistant", data.reply, topicRef.current);
-
             speak(data.reply);
+
+            // Оновлюємо прогрес
+            loadProgress();
         } catch (err) {
             console.error("Помилка:", err);
             setMessages((prev) => [
@@ -140,11 +177,11 @@ export default function Chat() {
     const clearHistory = async () => {
         if (!window.confirm("Видалити всю історію чату?")) return;
         try {
-            // Створюємо нового userId → історія "обнуляється"
             const newId = "user_" + Math.random().toString(36).slice(2, 10);
             localStorage.setItem("userId", newId);
             userIdRef.current = newId;
             setMessages([]);
+            setProgress(null);
             console.log("🗑️ Історія очищена, новий userId:", newId);
         } catch (err) {
             console.error("Помилка очищення:", err);
@@ -209,7 +246,7 @@ export default function Chat() {
         }
     };
 
-    // ===== ОЗВУЧКА (з очищенням від емодзі) =====
+    // ===== ОЗВУЧКА =====
     const speak = (text) => {
         if (!autoSpeakRef.current) return;
         window.speechSynthesis.cancel();
@@ -241,6 +278,28 @@ export default function Chat() {
     return (
         <div className="chat-container">
             <h1>English Practice</h1>
+
+            {/* Блок статистики */}
+            {progress && (
+                <div className="progress-bar">
+                    <div className="progress-item">
+                        <span className="progress-value">{progress.streak}</span>
+                        <span className="progress-label">Streak</span>
+                    </div>
+                    <div className="progress-item">
+                        <span className="progress-value">{progress.totalMessages}</span>
+                        <span className="progress-label">Повідомлень</span>
+                    </div>
+                    <div className="progress-item">
+                        <span className="progress-value">{progress.totalWords}</span>
+                        <span className="progress-label">Слів</span>
+                    </div>
+                    <div className="progress-item">
+                        <span className="progress-value">{progress.favoriteTopic}</span>
+                        <span className="progress-label">Тема</span>
+                    </div>
+                </div>
+            )}
 
             <div className="topic-selector">
                 <label>Тема:</label>

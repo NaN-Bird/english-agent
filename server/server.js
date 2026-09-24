@@ -43,6 +43,7 @@ const openai = new OpenAI({
 // ===== MONGODB =====
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/english-agent";
 let messagesCollection;
+let eventsCollection;
 
 const mongoClient = new MongoClient(MONGODB_URI);
 
@@ -51,6 +52,7 @@ mongoClient
     .then(() => {
         const db = mongoClient.db("english-agent");
         messagesCollection = db.collection("messages");
+        eventsCollection = db.collection("learning_events");
         console.log("✅ MongoDB підключено:", MONGODB_URI);
     })
     .catch((err) => {
@@ -159,6 +161,93 @@ app.get("/api/history/:userId", async (req, res) => {
         res.json({ messages });
     } catch (err) {
         console.error("❌ Помилка завантаження:", err);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// ===== ЗАПИС ПОДІЇ НАВЧАННЯ =====
+app.post("/api/track", async (req, res) => {
+    const { userId, type, topic, wordCount } = req.body;
+
+    if (!userId || !type) {
+        return res.status(400).json({ error: "userId і type обов'язкові" });
+    }
+
+    if (!eventsCollection) {
+        return res.status(503).json({ error: "MongoDB не підключено" });
+    }
+
+    try {
+        await eventsCollection.insertOne({
+            userId,
+            type,
+            topic: topic || "general",
+            wordCount: wordCount || 0,
+            createdAt: new Date(),
+        });
+        res.json({ ok: true });
+    } catch (err) {
+        console.error("❌ Помилка track:", err);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// ===== СТАТИСТИКА ПРОГРЕСУ =====
+app.get("/api/progress/:userId", async (req, res) => {
+    if (!eventsCollection) {
+        return res.status(503).json({ error: "MongoDB не підключено" });
+    }
+
+    try {
+        const events = await eventsCollection
+            .find({ userId: req.params.userId })
+            .sort({ createdAt: -1 })
+            .toArray();
+
+        // 1. Повідомлення
+        const totalMessages = events.filter((e) => e.type === "message_sent").length;
+
+        // 2. Слова
+        const totalWords = events.reduce((sum, e) => sum + (e.wordCount || 0), 0);
+
+        // 3. Улюблена тема
+        const topicCounts = {};
+        events.forEach((e) => {
+            if (e.topic) topicCounts[e.topic] = (topicCounts[e.topic] || 0) + 1;
+        });
+        const favoriteTopic =
+            Object.entries(topicCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+            "general";
+
+        // 4. Streak
+        const days = [
+            ...new Set(events.map((e) => e.createdAt.toISOString().split("T")[0])),
+        ]
+            .sort()
+            .reverse();
+
+        let streak = 0;
+        let expected = new Date().toISOString().split("T")[0];
+
+        for (const day of days) {
+            if (day === expected) {
+                streak++;
+                const d = new Date(expected);
+                d.setDate(d.getDate() - 1);
+                expected = d.toISOString().split("T")[0];
+            } else {
+                break;
+            }
+        }
+
+        res.json({
+            streak,
+            totalMessages,
+            totalWords,
+            favoriteTopic,
+        });
+    } catch (err) {
+        console.error("❌ Помилка progress:", err);
         res.status(500).json({ error: "Помилка сервера" });
     }
 });
