@@ -318,3 +318,18 @@
         min-width: 42px;
     }
 }
+.clear-btn {
+    margin-left: 10px;
+    padding: 6px 14px;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.clear-btn:hover {
+    background: #c0392b;
+}

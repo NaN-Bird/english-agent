@@ -2,6 +2,18 @@ import React, { useState, useRef, useEffect } from "react";
 import "./Chat.css";
 
 const API_URL = "/api/chat";
+const SAVE_URL = "/api/save-message";
+const HISTORY_URL = "/api/history";
+
+// Простий userId (поки без акаунтів)
+function getUserId() {
+    let id = localStorage.getItem("userId");
+    if (!id) {
+        id = "user_" + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem("userId", id);
+    }
+    return id;
+}
 
 export default function Chat() {
     const [messages, setMessages] = useState([]);
@@ -11,18 +23,19 @@ export default function Chat() {
     const [isListening, setIsListening] = useState(false);
     const [autoSpeak, setAutoSpeak] = useState(true);
     const [conversationMode, setConversationMode] = useState(false);
+    const [historyLoaded, setHistoryLoaded] = useState(false);
 
     const messagesEndRef = useRef(null);
     const recognitionRef = useRef(null);
+    const userIdRef = useRef(getUserId());
 
-    // 🔑 Refs для актуальних значень у замиканнях
+    // Refs для актуальних значень у замиканнях
     const conversationModeRef = useRef(conversationMode);
     const loadingRef = useRef(loading);
     const messagesRef = useRef(messages);
     const topicRef = useRef(topic);
     const autoSpeakRef = useRef(autoSpeak);
 
-    // Синхронізуємо refs зі станом
     useEffect(() => { conversationModeRef.current = conversationMode; }, [conversationMode]);
     useEffect(() => { loadingRef.current = loading; }, [loading]);
     useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -34,6 +47,48 @@ export default function Chat() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    // ===== ЗАВАНТАЖЕННЯ ІСТОРІЇ ПРИ СТАРТІ =====
+    useEffect(() => {
+        const loadHistory = async () => {
+            try {
+                const res = await fetch(`${HISTORY_URL}/${userIdRef.current}`);
+                if (!res.ok) throw new Error("Не вдалось завантажити історію");
+                const data = await res.json();
+                if (data.messages && data.messages.length > 0) {
+                    const restored = data.messages.map((m) => ({
+                        role: m.role,
+                        content: m.content,
+                    }));
+                    setMessages(restored);
+                    console.log("📜 Історія завантажена:", restored.length, "повідомлень");
+                }
+            } catch (err) {
+                console.warn("Історія не завантажена:", err.message);
+            } finally {
+                setHistoryLoaded(true);
+            }
+        };
+        loadHistory();
+    }, []);
+
+    // ===== ЗБЕРЕЖЕННЯ ПОВІДОМЛЕННЯ =====
+    const saveMessage = async (role, content, topicValue) => {
+        try {
+            await fetch(SAVE_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId: userIdRef.current,
+                    role,
+                    content,
+                    topic: topicValue,
+                }),
+            });
+        } catch (err) {
+            console.warn("Не вдалось зберегти повідомлення:", err.message);
+        }
+    };
+
     // ===== ВІДПРАВКА =====
     const sendMessage = async (text) => {
         if (!text.trim() || loadingRef.current) return;
@@ -43,6 +98,9 @@ export default function Chat() {
         setInput("");
         setLoading(true);
 
+        // Зберігаємо повідомлення користувача
+        saveMessage("user", text, topicRef.current);
+
         try {
             const response = await fetch(API_URL, {
                 method: "POST",
@@ -50,19 +108,23 @@ export default function Chat() {
                 body: JSON.stringify({
                     message: text,
                     history: messagesRef.current,
-                    topic: topicRef.current
-                })
+                    topic: topicRef.current,
+                }),
             });
 
             const data = await response.json();
             const aiMessage = { role: "assistant", content: data.reply };
             setMessages((prev) => [...prev, aiMessage]);
+
+            // Зберігаємо відповідь AI
+            saveMessage("assistant", data.reply, topicRef.current);
+
             speak(data.reply);
         } catch (err) {
             console.error("Помилка:", err);
             setMessages((prev) => [
                 ...prev,
-                { role: "assistant", content: "❌ Помилка з'єднання" }
+                { role: "assistant", content: "Помилка з'єднання" },
             ]);
         } finally {
             setLoading(false);
@@ -72,6 +134,21 @@ export default function Chat() {
     const handleSubmit = (e) => {
         e.preventDefault();
         sendMessage(input);
+    };
+
+    // ===== ОЧИСТИТИ ІСТОРІЮ =====
+    const clearHistory = async () => {
+        if (!window.confirm("Видалити всю історію чату?")) return;
+        try {
+            // Створюємо нового userId → історія "обнуляється"
+            const newId = "user_" + Math.random().toString(36).slice(2, 10);
+            localStorage.setItem("userId", newId);
+            userIdRef.current = newId;
+            setMessages([]);
+            console.log("🗑️ Історія очищена, новий userId:", newId);
+        } catch (err) {
+            console.error("Помилка очищення:", err);
+        }
     };
 
     // ===== ЗУПИНИТИ ВСЕ =====
@@ -92,11 +169,10 @@ export default function Chat() {
             window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (!SpeechRecognition) {
-            alert("❌ Ваш браузер не підтримує голосовий ввід");
+            alert("Ваш браузер не підтримує голосовий ввід");
             return;
         }
 
-        // Якщо вже слухаємо — не запускаємо знову
         if (isListening) return;
 
         const recognition = new SpeechRecognition();
@@ -105,18 +181,15 @@ export default function Chat() {
         recognition.interimResults = false;
         recognitionRef.current = recognition;
 
-        recognition.onstart = () => {
-            setIsListening(true);
-        };
+        recognition.onstart = () => setIsListening(true);
 
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
             setInput(transcript);
             setIsListening(false);
 
-            console.log("🎤 Розпізнано:", transcript, "| Режим бесіди:", conversationModeRef.current);
+            console.log("🎤 Розпізнано:", transcript);
 
-            // Автоматично відправити (перевіряємо через ref!)
             if (conversationModeRef.current) {
                 setTimeout(() => sendMessage(transcript), 300);
             }
@@ -127,9 +200,7 @@ export default function Chat() {
             setIsListening(false);
         };
 
-        recognition.onend = () => {
-            setIsListening(false);
-        };
+        recognition.onend = () => setIsListening(false);
 
         try {
             recognition.start();
@@ -138,19 +209,27 @@ export default function Chat() {
         }
     };
 
-    // ===== ОЗВУЧКА =====
+    // ===== ОЗВУЧКА (з очищенням від емодзі) =====
     const speak = (text) => {
         if (!autoSpeakRef.current) return;
         window.speechSynthesis.cancel();
 
-        const utterance = new SpeechSynthesisUtterance(text);
+        const cleanText = text
+            .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
+            .replace(/[\u{2600}-\u{27BF}]/gu, "")
+            .replace(/\*\*/g, "")
+            .replace(/\*/g, "")
+            .replace(/#{1,6}\s/g, "")
+            .replace(/`/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = "en-US";
         utterance.rate = 0.9;
         utterance.pitch = 1;
 
         utterance.onend = () => {
-            console.log("🔊 Озвучка закінчена | Режим бесіди:", conversationModeRef.current);
-            // Після озвучки — знову слухати (перевіряємо через ref!)
             if (conversationModeRef.current) {
                 setTimeout(() => startListening(), 500);
             }
@@ -161,7 +240,7 @@ export default function Chat() {
 
     return (
         <div className="chat-container">
-            <h1>🇬🇧 English Practice</h1>
+            <h1>English Practice</h1>
 
             <div className="topic-selector">
                 <label>Тема:</label>
@@ -172,6 +251,9 @@ export default function Chat() {
                     <option value="technology">Technology</option>
                     <option value="daily life">Daily Life</option>
                 </select>
+                <button className="clear-btn" onClick={clearHistory} title="Очистити історію">
+                    Очистити
+                </button>
             </div>
 
             <div className="speak-toggle">
@@ -181,7 +263,7 @@ export default function Chat() {
                         checked={autoSpeak}
                         onChange={(e) => setAutoSpeak(e.target.checked)}
                     />
-                    🔊 Озвучувати відповіді
+                    Озвучувати відповіді
                 </label>
             </div>
 
@@ -201,22 +283,27 @@ export default function Chat() {
                             }
                         }}
                     />
-                    🗣️ Режим бесіди (hands-free)
+                    Режим бесіди (hands-free)
                 </label>
 
                 {conversationMode && (
                     <button className="stop-btn" onClick={stopAll} title="Зупинити">
-                        ⏹️ Стоп
+                        Стоп
                     </button>
                 )}
             </div>
 
             <div className="messages">
-                {messages.length === 0 && (
+                {!historyLoaded && (
                     <div className="welcome">
-                        <p>👋 Hello! Let's practice English!</p>
+                        <p>Завантаження історії...</p>
+                    </div>
+                )}
+                {historyLoaded && messages.length === 0 && (
+                    <div className="welcome">
+                        <p>Hello! Let's practice English!</p>
                         <p>Напиши щось англійською — і я відповім!</p>
-                        <p>Або натисни 🎤 і говори.</p>
+                        <p>Або натисни «Говорити» і говори.</p>
                     </div>
                 )}
                 {messages.map((msg, index) => (
@@ -226,7 +313,7 @@ export default function Chat() {
                 ))}
                 {loading && (
                     <div className="message assistant">
-                        <div className="message-content">⏳ Думаю...</div>
+                        <div className="message-content">Думаю...</div>
                     </div>
                 )}
                 <div ref={messagesEndRef} />
@@ -237,7 +324,7 @@ export default function Chat() {
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={isListening ? "🎤 Слухаю..." : "Write in English..."}
+                    placeholder={isListening ? "Слухаю..." : "Write in English..."}
                     disabled={loading || isListening}
                 />
                 <button
@@ -247,10 +334,10 @@ export default function Chat() {
                     disabled={loading || isListening}
                     title="Говорити"
                 >
-                    {isListening ? "🔴" : "🎤"}
+                    {isListening ? "Стоп" : "Говорити"}
                 </button>
                 <button type="submit" disabled={loading || isListening}>
-                    📤
+                    Send
                 </button>
             </form>
         </div>

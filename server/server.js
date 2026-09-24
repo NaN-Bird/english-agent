@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import { MongoClient } from "mongodb";
 
 dotenv.config();
 
@@ -29,15 +30,32 @@ app.use(
 
 console.log("🚀 Сервер запущено!");
 
-// ===== GROQ (OpenAI-сумісний) =====
+// ===== GROQ =====
 if (!process.env.GROQ_API_KEY) {
-    console.error("❌ Немає GROQ_API_KEY у .env — сервер не зможе звертатися до AI");
+    console.error("❌ Немає GROQ_API_KEY у .env");
 }
 
 const openai = new OpenAI({
     baseURL: "https://api.groq.com/openai/v1",
     apiKey: process.env.GROQ_API_KEY || "missing",
 });
+
+// ===== MONGODB =====
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/english-agent";
+let messagesCollection;
+
+const mongoClient = new MongoClient(MONGODB_URI);
+
+mongoClient
+    .connect()
+    .then(() => {
+        const db = mongoClient.db("english-agent");
+        messagesCollection = db.collection("messages");
+        console.log("✅ MongoDB підключено:", MONGODB_URI);
+    })
+    .catch((err) => {
+        console.error("❌ MongoDB помилка:", err.message);
+    });
 
 // ===== AI CHAT =====
 app.post("/api/chat", async (req, res) => {
@@ -94,6 +112,53 @@ CRITICAL FORMATTING RULES — FOLLOW STRICTLY:
         res.json({ reply, topic });
     } catch (err) {
         console.error("❌ Помилка:", err?.response?.data || err.message || err);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// ===== ЗБЕРЕЖЕННЯ ПОВІДОМЛЕННЯ =====
+app.post("/api/save-message", async (req, res) => {
+    const { userId, role, content, topic } = req.body;
+
+    if (!userId || !role || !content) {
+        return res.status(400).json({ error: "userId, role, content обов'язкові" });
+    }
+
+    if (!messagesCollection) {
+        return res.status(503).json({ error: "MongoDB не підключено" });
+    }
+
+    try {
+        await messagesCollection.insertOne({
+            userId,
+            role,
+            content,
+            topic: topic || "general",
+            createdAt: new Date(),
+        });
+        res.json({ ok: true });
+    } catch (err) {
+        console.error("❌ Помилка збереження:", err);
+        res.status(500).json({ error: "Помилка сервера" });
+    }
+});
+
+// ===== ЗАВАНТАЖЕННЯ ІСТОРІЇ =====
+app.get("/api/history/:userId", async (req, res) => {
+    if (!messagesCollection) {
+        return res.status(503).json({ error: "MongoDB не підключено" });
+    }
+
+    try {
+        const messages = await messagesCollection
+            .find({ userId: req.params.userId })
+            .sort({ createdAt: 1 })
+            .limit(200)
+            .toArray();
+
+        res.json({ messages });
+    } catch (err) {
+        console.error("❌ Помилка завантаження:", err);
         res.status(500).json({ error: "Помилка сервера" });
     }
 });
