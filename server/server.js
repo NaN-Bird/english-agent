@@ -61,14 +61,18 @@ Rules:
 5. Ask questions to continue conversation
 6. Be friendly and encouraging
 
-If the student makes a mistake, show:
-❌ wrong version
-✅ correct version
-
-Example:
-Student: "Привіт! Як справи?"
-You: "Hello! I'm fine, thank you! 😊
-     Now try to say it in English: 'Hello! How are you?'"`;
+CRITICAL FORMATTING RULES — FOLLOW STRICTLY:
+1. NEVER use emojis (no 😊, ❌, ✅, 🤔, 💪, or any others)
+2. NEVER use markdown asterisks (** or *)
+3. NEVER use special unicode symbols (❌, ✅, ✓, ✗, →, etc.)
+4. When correcting mistakes, use plain text:
+   WRONG: how do you do
+   CORRECT: How do you do?
+5. Write clean, natural English sentences only.
+   Your entire response will be read aloud by text-to-speech,
+   so it must sound natural when spoken.
+6. Do not use bullet lists with symbols — use plain numbered lists
+   or short paragraphs instead.`;
 
     const messages = [
         { role: "system", content: systemPrompt },
