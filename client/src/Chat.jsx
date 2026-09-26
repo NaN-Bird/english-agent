@@ -30,6 +30,7 @@ export default function Chat() {
     const [conversationMode, setConversationMode] = useState(false);
     const [historyLoaded, setHistoryLoaded] = useState(false);
     const [progress, setProgress] = useState(null);
+    const [showContacts, setShowContacts] = useState(false);
 
     const messagesEndRef = useRef(null);
     const recognitionRef = useRef(null);
@@ -51,7 +52,6 @@ export default function Chat() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    // ===== ЗАВАНТАЖЕННЯ ІСТОРІЇ =====
     useEffect(() => {
         const loadHistory = async () => {
             try {
@@ -64,7 +64,6 @@ export default function Chat() {
                         content: m.content,
                     }));
                     setMessages(restored);
-                    console.log("📜 Історія завантажена:", restored.length);
                 }
             } catch (err) {
                 console.warn("Історія не завантажена:", err.message);
@@ -76,20 +75,17 @@ export default function Chat() {
         loadProgress();
     }, []);
 
-    // ===== ЗАВАНТАЖЕННЯ ПРОГРЕСУ =====
     const loadProgress = async () => {
         try {
             const res = await fetch(`${PROGRESS_URL}/${userIdRef.current}`);
             if (!res.ok) return;
             const data = await res.json();
             setProgress(data);
-            console.log("📊 Прогрес:", data);
         } catch (err) {
             console.warn("Прогрес не завантажено:", err.message);
         }
     };
 
-    // ===== ЗБЕРЕЖЕННЯ ПОВІДОМЛЕННЯ =====
     const saveMessage = async (role, content, topicValue) => {
         try {
             await fetch(SAVE_URL, {
@@ -107,7 +103,6 @@ export default function Chat() {
         }
     };
 
-    // ===== ЗАПИС ПОДІЇ =====
     const trackEvent = async (type, topicValue, wordCount = 0) => {
         try {
             await fetch(TRACK_URL, {
@@ -125,7 +120,6 @@ export default function Chat() {
         }
     };
 
-    // ===== ВІДПРАВКА =====
     const sendMessage = async (text) => {
         if (!text.trim() || loadingRef.current) return;
 
@@ -155,7 +149,6 @@ export default function Chat() {
             saveMessage("assistant", data.reply, topicRef.current);
             speak(data.reply);
 
-            // Оновлюємо прогрес
             loadProgress();
         } catch (err) {
             console.error("Помилка:", err);
@@ -173,7 +166,6 @@ export default function Chat() {
         sendMessage(input);
     };
 
-    // ===== ОЧИСТИТИ ІСТОРІЮ =====
     const clearHistory = async () => {
         if (!window.confirm("Видалити всю історію чату?")) return;
         try {
@@ -182,13 +174,11 @@ export default function Chat() {
             userIdRef.current = newId;
             setMessages([]);
             setProgress(null);
-            console.log("🗑️ Історія очищена, новий userId:", newId);
         } catch (err) {
             console.error("Помилка очищення:", err);
         }
     };
 
-    // ===== ЗУПИНИТИ ВСЕ =====
     const stopAll = () => {
         window.speechSynthesis.cancel();
         if (recognitionRef.current) {
@@ -197,10 +187,8 @@ export default function Chat() {
         setIsListening(false);
         setConversationMode(false);
         conversationModeRef.current = false;
-        console.log("⏹️ Все зупинено");
     };
 
-    // ===== РОЗПІЗНАВАННЯ =====
     const startListening = () => {
         const SpeechRecognition =
             window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -225,8 +213,6 @@ export default function Chat() {
             setInput(transcript);
             setIsListening(false);
 
-            console.log("🎤 Розпізнано:", transcript);
-
             if (conversationModeRef.current) {
                 setTimeout(() => sendMessage(transcript), 300);
             }
@@ -246,7 +232,6 @@ export default function Chat() {
         }
     };
 
-    // ===== ОЗВУЧКА =====
     const speak = (text) => {
         if (!autoSpeakRef.current) return;
         window.speechSynthesis.cancel();
@@ -279,7 +264,6 @@ export default function Chat() {
         <div className="chat-container">
             <h1>English Practice</h1>
 
-            {/* Блок статистики */}
             {progress && (
                 <div className="progress-bar">
                     <div className="progress-item">
@@ -399,6 +383,54 @@ export default function Chat() {
                     Send
                 </button>
             </form>
+
+            <footer className="app-footer">
+                <span>by </span>
+                <button
+                    className="author-link"
+                    onClick={() => setShowContacts(true)}
+                >
+                    NaN_Bird
+                </button>
+            </footer>
+
+            {showContacts && (
+                <div className="modal-overlay" onClick={() => setShowContacts(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h3>Зв'язатися з автором</h3>
+                        <a
+                            href="https://t.me/NaN_Bird"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="contact-link"
+                        >
+                            Telegram
+                        </a>
+                        <a
+                            href="https://github.com/NaN-Bird"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="contact-link"
+                        >
+                            GitHub
+                        </a>
+                        <a
+                            href="https://wa.me/NaN_Bird"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="contact-link"
+                        >
+                            WhatsApp
+                        </a>
+                        <button
+                            className="modal-close"
+                            onClick={() => setShowContacts(false)}
+                        >
+                            Закрити
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -15,4 +15,4 @@ client/build/
 # Системне
 .DS_Store
 .idea/
-.vscode/
+.vscode/".idea/" 

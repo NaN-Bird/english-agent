@@ -378,3 +378,96 @@
         font-size: 9px;
     }
 }
+/* ===== ФУТЕР ===== */
+.app-footer {
+    text-align: center;
+    margin-top: 20px;
+    padding: 12px 0;
+    font-size: 13px;
+    color: #888;
+}
+
+.author-link {
+    background: none;
+    border: none;
+    color: #2c3e50;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+    font-family: inherit;
+    transition: color 0.3s;
+}
+
+.author-link:hover {
+    color: #27ae60;
+    text-decoration: underline;
+}
+
+/* ===== МОДАЛКА ===== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 320px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    text-align: center;
+}
+
+.modal-content h3 {
+    margin: 0 0 16px;
+    color: #2c3e50;
+    font-size: 18px;
+}
+
+.contact-link {
+    display: block;
+    padding: 12px;
+    margin: 8px 0;
+    background: #f8f9fa;
+    border-radius: 10px;
+    color: #2c3e50;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.contact-link:hover {
+    background: #2c3e50;
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+.modal-close {
+    margin-top: 16px;
+    padding: 12px 28px;
+    min-height: 44px;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    transition: background 0.3s;
+}
+
+.modal-close:hover {
+    background: #c0392b;
+}
